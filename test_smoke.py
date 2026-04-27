@@ -34,6 +34,18 @@ try:
 except Exception as e:
     print(f"[FAIL] Commands: {e}")
 
+# Test 3b: Voice normalization
+try:
+    from ken.voice import normalize_command
+    if normalize_command("hello") != "hello":
+        print("[FAIL] Voice normalization: 'hello' should not be rewritten")
+    elif normalize_command("know") != "no":
+        print("[FAIL] Voice normalization: 'know' should map to 'no'")
+    else:
+        print("[OK] Voice normalization checks passed")
+except Exception as e:
+    print(f"[FAIL] Voice normalization: {e}")
+
 # Test 4: Utils (Ollama check)
 try:
     from ken.utils import check_ollama_running

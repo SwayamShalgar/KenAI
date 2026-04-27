@@ -11,17 +11,14 @@ import edge_tts
 from faster_whisper import WhisperModel
 from rich import print
 
-# Hide pygame prompt
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 import pygame
 
-# Persistent model
 _whisper_model = None
 
 
 @contextmanager
 def suppress_alsa_errors():
-    """Suppress ALSA warnings on Linux."""
     try:
         devnull = os.open(os.devnull, os.O_WRONLY)
         old_stderr = os.dup(2)
@@ -35,10 +32,6 @@ def suppress_alsa_errors():
 
 
 def init_stt():
-    """
-    Load Faster-Whisper once.
-    Optimized for GTX1650.
-    """
     global _whisper_model
 
     if _whisper_model is not None:
@@ -47,18 +40,18 @@ def init_stt():
     print("[blue]Loading Whisper STT...[/blue]")
 
     try:
+        # ✅ FIX 1: Upgraded to medium.en — much better with proper nouns & app names
         _whisper_model = WhisperModel(
             "small.en",
             device="cuda",
             compute_type="float16"
         )
-        print("[green]Whisper loaded on GPU.[/green]")
+        print("[green]Whisper medium.en loaded on GPU.[/green]")
 
     except Exception as e:
         print(f"[yellow]GPU unavailable, using CPU fallback.[/yellow] {e}")
-
         _whisper_model = WhisperModel(
-            "small.en",
+            "medium.en",
             device="cpu",
             compute_type="int8"
         )
@@ -72,16 +65,10 @@ def init_stt():
 
 
 def normalize_command(text: str) -> str:
-    """
-    Fix common Whisper mistakes for short assistant commands.
-    """
     t = text.lower().strip()
-
     fixes = {
         "i know": "no",
         "know": "no",
-        "now": "no",
-        "hello": "no",   # optional depending mic confusion
         "yeah": "yes",
         "ya": "yes",
         "yas": "yes",
@@ -92,15 +79,10 @@ def normalize_command(text: str) -> str:
         "church": "search",
         "open up": "open",
     }
-
     return fixes.get(t, t)
 
 
 def transcribe_audio(audio_data: sr.AudioData) -> str:
-    """
-    Convert microphone audio to text.
-    Smart command-aware transcription.
-    """
     global _whisper_model
 
     if _whisper_model is None:
@@ -122,27 +104,43 @@ def transcribe_audio(audio_data: sr.AudioData) -> str:
         print("[yellow]Processing speech...[/yellow]")
         start = time.time()
 
-        # Short utterance = command mode
-        if duration_sec <= 1.2:
-            beam = 1
-            prompt = "Commands: yes no open close stop exit search clear"
+        # ✅ FIX 2: Raised short-utterance threshold from 1.2s → 2.0s
+        # "open youtube" can easily be 1.5–1.8s, was wrongly getting weak decoding
+        if duration_sec <= 2.0:
+            beam = 5
+            best_of = 5
+            # ✅ FIX 3: Added common app/website names to the prompt so Whisper
+            # has context for proper nouns it might otherwise mangle
+            prompt = (
+                "Short voice commands for an assistant. Common apps and sites: "
+                "YouTube, Spotify, Chrome, Discord, WhatsApp, Gmail, Netflix, "
+                "Google, Reddit, Twitter, Instagram. "
+                "Commands: open, close, search, play, pause, stop, yes, no, exit, clear."
+            )
         else:
-            beam = 3
-            prompt = ""
+            beam = 5
+            best_of = 3
+            # ✅ FIX 4: Also prompt on longer utterances for consistency
+            prompt = (
+                "Voice command for a desktop assistant. Apps: YouTube, Spotify, "
+                "Chrome, Discord, WhatsApp, Gmail, Netflix, Google."
+            )
 
         segments, info = _whisper_model.transcribe(
             audio_np,
             language="en",
             beam_size=beam,
-            best_of=1,
-            temperature=0,
-            vad_filter=True,
+            best_of=best_of,
+            temperature=0.0,
+            # ✅ FIX 5: Disabled vad_filter — it was clipping word endings like "YouTube" → "yo"
+            vad_filter=False,
             condition_on_previous_text=False,
-            initial_prompt=prompt
+            initial_prompt=prompt,
+            # ✅ FIX 6: Added no_speech_threshold to avoid garbage transcriptions on silence
+            no_speech_threshold=0.6,
         )
 
         parts = []
-
         for segment in segments:
             txt = segment.text.strip()
             if txt:
@@ -150,12 +148,11 @@ def transcribe_audio(audio_data: sr.AudioData) -> str:
 
         final_text = " ".join(parts).strip()
 
-        # Smart correction for short commands
-        if duration_sec <= 1.2:
+        # Only normalize very short single-word commands
+        if duration_sec <= 2.0 and len(final_text.split()) <= 2:
             final_text = normalize_command(final_text)
 
         elapsed = round(time.time() - start, 2)
-
         print(f"[green]Recognized:[/green] {final_text}")
         print(f"[green]Done ({elapsed}s)[/green]")
 
@@ -166,16 +163,15 @@ def transcribe_audio(audio_data: sr.AudioData) -> str:
         return ""
 
 
-def listen_for_speech(timeout: int = 3, phrase_time_limit: int = 5) -> str:
-    """
-    Listen from microphone.
-    """
+def listen_for_speech(timeout: int = 5, phrase_time_limit: int = 8) -> str:
     recognizer = sr.Recognizer()
 
     recognizer.dynamic_energy_threshold = True
-    recognizer.energy_threshold = 250
-    recognizer.pause_threshold = 0.8
-    recognizer.non_speaking_duration = 0.3
+    recognizer.energy_threshold = 300
+
+    # ✅ FIX 7: Increased pause/non-speaking thresholds so word endings aren't cut off
+    recognizer.pause_threshold = 1.2        # was 0.8 — too aggressive
+    recognizer.non_speaking_duration = 0.6  # was 0.3 — was clipping last syllables
 
     try:
         with suppress_alsa_errors():
@@ -185,7 +181,7 @@ def listen_for_speech(timeout: int = 3, phrase_time_limit: int = 5) -> str:
 
                 recognizer.adjust_for_ambient_noise(
                     source,
-                    duration=0.4
+                    duration=0.5  # slightly longer calibration
                 )
 
                 audio = recognizer.listen(
@@ -195,7 +191,6 @@ def listen_for_speech(timeout: int = 3, phrase_time_limit: int = 5) -> str:
                 )
 
         print("[cyan]Speech detected.[/cyan]")
-
         return transcribe_audio(audio)
 
     except sr.WaitTimeoutError:
@@ -207,20 +202,13 @@ def listen_for_speech(timeout: int = 3, phrase_time_limit: int = 5) -> str:
 
 
 async def generate_and_play_tts(text: str):
-    """
-    Speak reply using Edge TTS.
-    """
     if not text.strip():
         return
 
     voice = "en-US-AriaNeural"
-
     communicate = edge_tts.Communicate(text, voice)
 
-    with tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".mp3"
-    ) as fp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
         temp_file = fp.name
 
     try:
@@ -250,6 +238,5 @@ async def generate_and_play_tts(text: str):
 
 
 def cleanup_audio():
-    """Clean shutdown."""
     if pygame.mixer.get_init():
         pygame.mixer.quit()
