@@ -72,6 +72,34 @@ pip install -r requirements.txt
 python -m ken.main
 ```
 
+## Assistant Modes and Model Switching
+
+Ken now supports tuned assistant modes and direct model selection from CLI:
+
+```bash
+uv run ken --mode linux
+uv run ken --mode coding
+uv run ken --mode tutor
+uv run ken --mode fast
+uv run ken --mode think
+
+uv run ken --model llama3.2:3b
+uv run ken --model qwen2.5:4b
+uv run ken --model mistral:latest
+
+uv run ken --mode think --model qwen2.5:4b --benchmark
+```
+
+Inside an active session, you can switch instantly:
+
+```text
+/mode linux
+/mode coding
+/model qwen2.5:4b
+/bench on
+/status
+```
+
 ### 3. Pulling Models (Requires Ollama)
 
 Ken relies on [Ollama](https://ollama.com) for local AI execution. Make sure it's installed and running.

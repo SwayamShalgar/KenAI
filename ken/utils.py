@@ -8,7 +8,7 @@ console = Console()
 async def check_ollama_running() -> bool:
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
-            resp = await client.get(config.ollama_url)
+            resp = await client.get(f"{config.ollama_url}/api/tags")
             return resp.status_code == 200
     except Exception:
         return False
