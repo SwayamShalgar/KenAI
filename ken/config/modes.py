@@ -1,8 +1,5 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, Literal
-
-from pydantic_settings import BaseSettings
 
 ModeName = Literal["linux", "coding", "tutor", "fast", "think"]
 
@@ -95,46 +92,20 @@ MODEL_ALIASES = {
 }
 
 
-class KenConfig(BaseSettings):
-    ollama_url: str = "http://127.0.0.1:11434"
-    model: str = "llama3.2:3b"
-    default_mode: ModeName = "linux"
-    request_timeout_s: float = 60.0
-    ollama_keep_alive: str = "15m"
-
-    # CPU-safe defaults; override with KEN_OLLAMA_NUM_GPU and KEN_OLLAMA_NUM_THREAD as needed.
-    ollama_num_gpu: int = 0
-    ollama_num_thread: int = 6
-
-    memory_recent_window: int = 12
-    memory_summary_trigger: int = 40
-    memory_keep_after_summary: int = 12
-    memory_summary_char_limit: int = 2200
-
-    data_dir: Path = Path.home() / ".local" / "share" / "ken"
-
-    class Config:
-        env_prefix = "KEN_"
-
-
-def get_mode_profile(mode: str | None) -> ModeProfile:
+def get_mode_profile(mode: str | None, default_mode: ModeName) -> ModeProfile:
     if not mode:
-        return MODE_PROFILES[config.default_mode]
+        return MODE_PROFILES[default_mode]
     normalized = mode.strip().lower()
     if normalized not in MODE_PROFILES:
-        return MODE_PROFILES[config.default_mode]
+        return MODE_PROFILES[default_mode]
     return MODE_PROFILES[normalized]  # type: ignore[index]
 
 
-def resolve_model_name(model_name: str | None) -> str:
+def resolve_model_name(model_name: str | None, default_model: str) -> str:
     if not model_name:
-        return config.model
+        return default_model
     cleaned = model_name.strip()
     if not cleaned:
-        return config.model
+        return default_model
     alias = MODEL_ALIASES.get(cleaned.lower())
     return alias or cleaned
-
-
-config = KenConfig()
-config.data_dir.mkdir(parents=True, exist_ok=True)
