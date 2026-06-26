@@ -26,6 +26,7 @@ Ken is your personal Linux AI assistant. It runs entirely on your machine using 
 - 🧠 **Conversational AI** — Persistent sessions with context memory
 - 🔧 **Skills system** — Modular plugins: shell, files, web search, system info, notes
 - 🖥️ **Beautiful CLI** — Rich terminal UI with streaming responses
+- ✨ **Desktop GUI** — PyQt6 voice-first window with orb, chat, visualizer, and settings
 - ⚡ **Fast** — Async throughout, streaming from first token
 - 🔒 **Private** — 100% local inference, zero telemetry
 - 🔌 **Expandable** — Drop a Python file in `skills/` to add new capabilities
@@ -54,6 +55,8 @@ We highly recommend using `uv` to run Ken, as it seamlessly isolates dependencie
    uv run python -m ken.main
    # or
    uv run ken
+  # GUI
+  uv run ken gui
    ```
 
 ### Option 2: Standard Python Virtual Environment
@@ -180,7 +183,31 @@ ken/
 ├── core/           # Conversation engine, memory, planner
 ├── llm/            # LLM provider abstraction (Ollama, OpenAI-compat)
 ├── skills/         # Plugin system — each skill is self-contained
-├── ui/             # CLI interface (Rich + prompt-toolkit)
+├── ui/             # PyQt6 desktop UI, widgets, theme, animations, bridge
+├── interfaces/     # CLI and GUI entry points
 └── main.py         # Entry point
 ```
+
+## GUI
+
+The desktop UI lives in `ken/ui/` and is launched with `uv run ken gui`.
+
+What it includes:
+
+- Borderless, translucent main window
+- Siri-inspired orb with listening, processing, speaking, and error states
+- Voice visualizer bars reacting to live microphone energy
+- Chat panel with markdown rendering and fenced code blocks
+- Copy-code controls for code blocks
+- Settings dialog for theme, animation intensity, mic/speaker choice, wake word, and boot autostart
+
+### Visual states to capture locally
+
+To produce screenshots or a GIF for release notes, capture these states after launching the GUI:
+
+1. Idle home screen
+1. Listening with live visualizer activity
+1. Processing while a response streams
+1. Speaking with the orb in the speaking state
+1. Error state with a visible failure message
 # KenAI

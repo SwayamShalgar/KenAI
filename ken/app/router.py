@@ -15,6 +15,7 @@ class RouteOutcome:
     message_style: str | None = None
     speak_text: str | None = None
     trailing_newline: bool = False
+    modified_prompt: str | None = None
 
 
 def handle_input(
@@ -101,6 +102,34 @@ def handle_input(
             message="Memory cleared.",
             message_style="green",
         )
+
+    import re
+    weather_match = re.match(r"^(?:what is the )?weather(?: like)?(?: in| for)?\s+(.+)$", text_lower)
+    if weather_match:
+        city = weather_match.group(1).strip().rstrip("?")
+        if city:
+            import httpx
+            try:
+                r = httpx.get(f"https://wttr.in/{city}?format=%C+%t,+%w,+%h+humidity,+%P+pressure", timeout=4.0)
+                if r.status_code == 200 and r.text and "Unknown location" not in r.text:
+                    modified = f"Question: {text}\n\nI have fetched the real-time weather data for {city}: {r.text}\nSynthesize this into a natural, conversational response."
+                    return RouteOutcome(handled=False, modified_prompt=modified)
+            except Exception:
+                pass
+                
+    search_prefixes = ["search ", "search for ", "look up ", "who is ", "what is the current ", "latest news "]
+    for prefix in search_prefixes:
+        if text_lower.startswith(prefix):
+            query = text[len(prefix):].strip()
+            if prefix in ["who is ", "what is the current ", "latest news "]:
+                query = text.strip()
+            
+            from ken.integrations.web.search import search_web
+            context = search_web(query)
+            if context:
+                modified = f"Question: {text}\n\nI have fetched these latest web results to help you answer. Synthesize them into a natural, conversational response:\n\n{context}"
+                return RouteOutcome(handled=False, modified_prompt=modified)
+            break
 
     handled, response = route_command(text)
     if handled and response:

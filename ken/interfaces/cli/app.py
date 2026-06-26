@@ -4,6 +4,7 @@ import typer
 from ken.app.session import chat_loop
 from ken.config import config
 from ken.interfaces.cli.ui import print_message
+from ken.interfaces.gui import run_gui
 
 app = typer.Typer(add_completion=False)
 
@@ -35,3 +36,9 @@ def start(
         print_message("Goodbye!", style="blue")
         import os
         os._exit(0)
+
+
+@app.command()
+def gui():
+    """Start the Ken GUI assistant."""
+    run_gui()

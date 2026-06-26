@@ -97,7 +97,8 @@ async def stream_chat(
 
         loop = asyncio.get_running_loop()
         started_at = loop.time()
-        async with httpx.AsyncClient(timeout=config.request_timeout_s) as client:
+        timeout = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream("POST", f"{config.ollama_url}/api/chat", json=payload) as response:
                 response.raise_for_status()
                 async for chunk in response.aiter_lines():

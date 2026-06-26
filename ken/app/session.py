@@ -126,8 +126,9 @@ async def chat_loop(
             console.print("")
             full_response = ""
             benchmark_report: dict = {}
+            actual_prompt = outcome.modified_prompt if outcome.modified_prompt else user_input
             async for chunk in llm_service.stream_chat(
-                user_input,
+                actual_prompt,
                 memory_service.memory,
                 mode=state.active_mode,
                 model=state.active_model,
